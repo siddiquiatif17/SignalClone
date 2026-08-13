@@ -1,0 +1,12 @@
+{
+  "name": "signal-clone-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Signal Clone Project Root",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "cd backend && venv\\Scripts\\python.exe -m uvicorn app.main:app --reload --port 8001",
+    "seed": "cd backend && venv\\Scripts\\python.exe -m app.seed",
+    "install:frontend": "npm --prefix frontend install"
+  }
+}
