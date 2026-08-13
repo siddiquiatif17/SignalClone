@@ -14,17 +14,39 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Signal Clone API", version="1.0.0", lifespan=lifespan)
 
 # Enable CORS for frontend requests
-# Typically frontend runs on localhost:3000, but we also allow other origins for robustness.
-allowed_origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
-allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+allowed_origins_env = os.getenv("CORS_ALLOWED_ORIGINS") or os.getenv("CORS_ORIGIN") or "http://localhost:3000"
+# Parse and clean brackets/quotes/spaces from the raw configuration string
+raw_origins = allowed_origins_env.split(",")
+allowed_origins = []
+for origin in raw_origins:
+    cleaned = origin.strip().strip("[]'\"")
+    if cleaned:
+        allowed_origins.append(cleaned)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+print(f"CORS raw environment configuration string: {allowed_origins_env}", flush=True)
+print(f"CORS parsed and cleaned allow_origins list: {allowed_origins}", flush=True)
+
+if "*" in allowed_origins:
+    # Starlette raises RuntimeError if allow_origins=['*'] when allow_credentials=True.
+    # We solve this by using allow_origin_regex matching all origins while enabling credentials.
+    print("CORS wildcard detected with credentials enabled. Configuring via allow_origin_regex.", flush=True)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex="https?://.*",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    print("CORS middleware configured with allow_origins=*", flush=True)
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    print(f"CORS middleware configured with allow_origins={allowed_origins}", flush=True)
 
 from app.routers.auth import router as auth_router
 from app.routers.conversations import router as conversations_router
