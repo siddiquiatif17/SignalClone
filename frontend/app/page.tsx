@@ -733,7 +733,7 @@ export default function Home() {
       </div>
 
       {/* RIGHT CHAT PANE */}
-      <div className={`${showRightPane ? "flex" : "hidden"} flex-1 flex-col bg-white dark:bg-slate-955`}>
+      <div className={`${showRightPane ? "flex" : "hidden"} flex-1 flex-col bg-white dark:bg-slate-950`}>
         {/* Render placeholder screens if active tab is selected */}
         {activeTab === "calls" && (
           <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -889,7 +889,7 @@ export default function Home() {
                 </div>
 
                 {/* Chat Messages Scroll List */}
-                <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-955 px-4 py-3 flex flex-col space-y-3">
+                <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-950 px-4 py-3 flex flex-col space-y-3">
                   {messagesLoading ? (
                     <div className="flex-1 flex items-center justify-center">
                       <svg className="animate-spin h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24">
@@ -960,7 +960,7 @@ export default function Home() {
                                     className={`flex flex-col p-3 rounded-2xl shadow-sm border ${
                                       isSelf
                                         ? "bg-blue-600 text-white rounded-tr-none text-right border-blue-600"
-                                        : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none text-left border-slate-200 dark:border-slate-800"
+                                        : "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-tl-none text-left border-slate-300 dark:border-slate-800"
                                     }`}
                                   >
                                     {/* Sender name above content in group chat */}
@@ -1037,7 +1037,7 @@ export default function Home() {
 
                 {/* Typing Indicator Bar */}
                 {typingText && (
-                  <div className="px-4 py-1.5 text-[10px] text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-955 flex items-center gap-2 select-none border-t border-slate-200 dark:border-slate-900">
+                  <div className="px-4 py-1.5 text-[10px] text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-950 flex items-center gap-2 select-none border-t border-slate-200 dark:border-slate-900">
                     <span className="flex gap-0.5">
                       <span className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "0ms" }}></span>
                       <span className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "150ms" }}></span>
@@ -1085,7 +1085,7 @@ export default function Home() {
                     value={newMessage}
                     onChange={(e) => handleComposeChange(e.target.value)}
                     placeholder="New message"
-                    className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-955 px-4 py-2.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-blue-600 transition-colors"
+                    className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 px-4 py-2.5 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-blue-600 transition-colors"
                   />
 
                   <button
@@ -1101,7 +1101,7 @@ export default function Home() {
                 </form>
               </div>
             ) : (
-              <div className="flex flex-1 flex-col bg-white dark:bg-slate-955">
+              <div className="flex flex-1 flex-col bg-white dark:bg-slate-950">
                 {/* Top Spacer / Decoration Bar */}
                 <div className="h-1 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
 

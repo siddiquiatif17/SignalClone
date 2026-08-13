@@ -306,7 +306,7 @@ export default function GroupMembersModal({ isOpen, onClose, conversationId }: G
                               Admin
                             </span>
                           ) : (
-                            <span className="rounded-full bg-slate-100 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 px-2.5 py-0.5 text-[9px] font-semibold text-slate-500 dark:text-slate-400 select-none">
+                            <span className="rounded-full bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-2.5 py-0.5 text-[9px] font-semibold text-slate-500 dark:text-slate-400 select-none">
                               Member
                             </span>
                           )}
