@@ -29,11 +29,25 @@ def add_contact(
     """
     identifier = request.contact_identifier.strip()
     
+    # Log the raw identifier string received from the frontend
+    print(f"DEBUG: received contact_identifier: {repr(identifier)}", flush=True)
+    
     # 1. Look up contact user by phone or username
-    contact_user = db.query(User).filter(
-        (User.username == identifier) | 
-        (User.phone_number == identifier)
-    ).first()
+    # Normalize identifier by stripping spaces and dashes
+    cleaned_id = identifier.replace(" ", "").replace("-", "")
+    is_phone_like = (cleaned_id.startswith("+") and cleaned_id[1:].isdigit()) or cleaned_id.isdigit()
+    
+    if is_phone_like:
+        phone_variants = [cleaned_id] if cleaned_id.startswith("+") else [cleaned_id, f"+{cleaned_id}"]
+        contact_user = db.query(User).filter(
+            (User.username == identifier) | 
+            (User.phone_number.in_(phone_variants))
+        ).first()
+    else:
+        contact_user = db.query(User).filter(
+            (User.username == identifier) | 
+            (User.phone_number == identifier)
+        ).first()
     
     if not contact_user:
         raise HTTPException(

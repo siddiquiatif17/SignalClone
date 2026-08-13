@@ -133,7 +133,7 @@ export default function ContactsModal({ isOpen, onClose, onSelectConversation }:
               type="text"
               value={newContactIdentifier}
               onChange={(e) => setNewContactIdentifier(e.target.value)}
-              placeholder="Enter phone or username"
+              placeholder="e.g. +1234567890 or username"
               className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-955 px-3 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-none focus:border-blue-600 transition-colors"
             />
             <button
