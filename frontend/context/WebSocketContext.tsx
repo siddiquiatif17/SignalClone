@@ -5,6 +5,7 @@ import { useAuth } from "./AuthContext";
 
 interface WebSocketContextType {
   isConnected: boolean;
+  presenceMap: Record<number, { is_online: boolean; last_seen: string | null }>;
   sendEvent: (type: string, payload: Record<string, any>) => void;
   subscribe: (eventType: string, callback: (data: any) => void) => void;
   unsubscribe: (eventType: string, callback: (data: any) => void) => void;
@@ -17,6 +18,8 @@ const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8001";
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const { token, user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
+  const [presenceMap, setPresenceMap] = useState<Record<number, { is_online: boolean; last_seen: string | null }>>({});
+  
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
@@ -67,6 +70,26 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Internal listener to build the presenceMap dynamically
+  useEffect(() => {
+    const handlePresence = (event: any) => {
+      if (event.user_id) {
+        setPresenceMap((prev) => ({
+          ...prev,
+          [event.user_id]: {
+            is_online: event.is_online,
+            last_seen: event.last_seen,
+          },
+        }));
+      }
+    };
+    
+    subscribe("presence", handlePresence);
+    return () => {
+      unsubscribe("presence", handlePresence);
+    };
+  }, []);
+
   useEffect(() => {
     // Connect only if authenticated
     if (!token || !user) {
@@ -82,7 +105,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       if (socketRef.current) return;
 
       const wsUrl = `${WS_BASE_URL}/ws/${token}`;
-      console.log("🔌 Connecting to WebSocket:", wsUrl.replace(token, "[TOKEN_HIDDEN]"));
+      console.log("🔌 Connecting to WebSocket URL (UNMASKED):", wsUrl);
       
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
@@ -110,19 +133,30 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       };
 
       ws.onclose = (event) => {
-        console.log(`❌ WebSocket closed: code=${event.code}, reason=${event.reason}`);
+        let errorMsg = `WebSocket closed: code=${event.code}`;
+        if (event.code === 4001) {
+          errorMsg = "WebSocket Authentication Failed (code 4001). Check token validity.";
+        } else if (event.code === 1006) {
+          errorMsg = "WebSocket Abnormal Closure (code 1006). Check backend is running, host/port are correct, and firewall settings.";
+        } else if (event.reason) {
+          errorMsg += `, reason=${event.reason}`;
+        }
+        console.error(`❌ ${errorMsg}`);
         setIsConnected(false);
         socketRef.current = null;
 
-        // Auto reconnect with backoff
-        if (token) {
-          const backoff = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
-          console.log(`⏳ Reconnecting in ${backoff / 1000}s (Attempt ${reconnectAttemptsRef.current + 1})`);
+        // Auto reconnect with backoff (capped at 5 attempts)
+        if (token && reconnectAttemptsRef.current < 5) {
+          const backoffs = [1000, 2000, 4000, 8000, 16000];
+          const backoff = backoffs[reconnectAttemptsRef.current];
+          console.log(`⏳ Reconnecting in ${backoff / 1000}s (Attempt ${reconnectAttemptsRef.current + 1}/5)`);
           reconnectAttemptsRef.current += 1;
           
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, backoff);
+        } else if (reconnectAttemptsRef.current >= 5) {
+          console.error("❌ WebSocket reconnect attempts exceeded maximum limit of 5. Giving up.");
         }
       };
 
@@ -146,7 +180,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   }, [token, user]);
 
   return (
-    <WebSocketContext.Provider value={{ isConnected, sendEvent, subscribe, unsubscribe }}>
+    <WebSocketContext.Provider value={{ isConnected, presenceMap, sendEvent, subscribe, unsubscribe }}>
       {children}
     </WebSocketContext.Provider>
   );

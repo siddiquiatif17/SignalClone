@@ -1,4 +1,5 @@
 import logging
+import traceback
 from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, status
 from sqlalchemy.orm import Session
@@ -19,43 +20,56 @@ async def websocket_endpoint(websocket: WebSocket, token: str, db: Session = Dep
     WebSocket endpoint that authenticates a user via a path JWT token,
     accepts the connection, manages active sessions, and broadcasts presence events.
     """
-    # 1. Validate JWT Token
-    payload = decode_token(token)
-    if not payload:
-        logger.warning("Rejected WebSocket connection: Invalid JWT token signature")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid authentication token")
-        return
-        
-    username = payload.get("sub")
-    if not username:
-        logger.warning("Rejected WebSocket connection: Token missing sub claim")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token payload")
-        return
-        
-    # Get user profile
-    user = db.query(User).filter(User.username == username).first()
-    if not user:
-        logger.warning(f"Rejected WebSocket connection: User '{username}' not found in database")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authenticated user not found")
-        return
-
-    # 2. Query contact list to know who to notify about presence
-    # Find people this user added, and people who added this user
-    contacts_owned = db.query(Contact).filter(Contact.owner_id == user.id).all()
-    contacts_added = db.query(Contact).filter(Contact.contact_user_id == user.id).all()
+    is_accepted = False
+    user_id = None
     
-    contact_ids = set()
-    for c in contacts_owned:
-        contact_ids.add(c.contact_user_id)
-    for c in contacts_added:
-        contact_ids.add(c.owner_id)
-    contact_ids = list(contact_ids)
-
-    # 3. Accept and register connection
-    await manager.connect(user.id, websocket)
-
-    # 4. Mark user online & Broadcast presence
     try:
+        # 1. Validate JWT Token before accepting the socket
+        payload = decode_token(token)
+        if not payload:
+            logger.warning("Rejected WebSocket connection: Invalid JWT token signature")
+            await websocket.close(code=4001)
+            return
+            
+        username = payload.get("sub")
+        if not username:
+            logger.warning("Rejected WebSocket connection: Token missing sub claim")
+            await websocket.close(code=4001)
+            return
+            
+        # Get user profile
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            logger.warning(f"Rejected WebSocket connection: User '{username}' not found in database")
+            await websocket.close(code=4001)
+            return
+            
+        user_id = user.id
+        
+        # 2. Query contact list and sharing conversation participants to notify about presence
+        user_convs = db.query(ConversationParticipant.conversation_id).filter(
+            ConversationParticipant.user_id == user.id
+        ).subquery()
+        sharing_participants = db.query(ConversationParticipant.user_id).filter(
+            ConversationParticipant.conversation_id.in_(user_convs)
+        ).distinct().all()
+        
+        recipient_ids = set([r[0] for r in sharing_participants if r[0] != user.id])
+        
+        contacts_owned = db.query(Contact).filter(Contact.owner_id == user.id).all()
+        contacts_added = db.query(Contact).filter(Contact.contact_user_id == user.id).all()
+        for c in contacts_owned:
+            recipient_ids.add(c.contact_user_id)
+        for c in contacts_added:
+            recipient_ids.add(c.owner_id)
+        
+        contact_ids = list(recipient_ids)
+        
+        # 3. Accept and register connection
+        await manager.connect(user.id, websocket)
+        is_accepted = True
+        
+        # 4. Mark user online & Broadcast presence
         user.is_online = True
         db.commit()
         
@@ -66,18 +80,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str, db: Session = Dep
             "last_seen": None
         }
         await manager.broadcast_to_users(contact_ids, presence_event)
-    except Exception as e:
-        logger.error(f"Error marking user {user.id} online: {str(e)}")
-        db.rollback()
-
-    # 5. Receive message loop
-    try:
+        
+        # 5. Receive message loop
         while True:
-            # Wait for JSON payload from client
             data = await websocket.receive_json()
-            
             logger.info(f"WebSocket client event received from user {user.id} ({user.username}): {data}")
-            
             event_type = data.get("type")
             if not event_type:
                 logger.warning(f"Received malformed WS message without 'type' key from user {user.id}")
@@ -159,32 +166,62 @@ async def websocket_endpoint(websocket: WebSocket, token: str, db: Session = Dep
                 logger.warning(f"Received unsupported client event type '{event_type}' from user {user.id}")
                 
     except WebSocketDisconnect:
-        # Handle cleanup on drop
-        manager.disconnect(user.id, websocket)
+        # Handle cleanup on disconnect
+        if user_id is not None:
+            manager.disconnect(user_id, websocket)
+            
+            # Check if user has no remaining active sessions
+            if user_id not in manager.active_connections:
+                db_cleanup = SessionLocal()
+                try:
+                    db_user = db_cleanup.query(User).filter(User.id == user_id).first()
+                    if db_user:
+                        db_user.is_online = False
+                        db_user.last_seen = datetime.utcnow()
+                        db_cleanup.commit()
+                        
+                        logger.info(f"User {user_id} is now fully offline.")
+                        
+                        # Find all sharing conversation participants
+                        user_convs = db_cleanup.query(ConversationParticipant.conversation_id).filter(
+                            ConversationParticipant.user_id == user_id
+                        ).subquery()
+                        sharing_participants = db_cleanup.query(ConversationParticipant.user_id).filter(
+                            ConversationParticipant.conversation_id.in_(user_convs)
+                        ).distinct().all()
+                        
+                        recipient_ids = set([r[0] for r in sharing_participants if r[0] != user_id])
+                        
+                        contacts_owned = db_cleanup.query(Contact).filter(Contact.owner_id == user_id).all()
+                        contacts_added = db_cleanup.query(Contact).filter(Contact.contact_user_id == user_id).all()
+                        for c in contacts_owned:
+                            recipient_ids.add(c.contact_user_id)
+                        for c in contacts_added:
+                            recipient_ids.add(c.owner_id)
+                        
+                        contact_ids = list(recipient_ids)
+                        
+                        offline_event = {
+                            "type": "presence",
+                            "user_id": user_id,
+                            "is_online": False,
+                            "last_seen": db_user.last_seen.isoformat()
+                        }
+                        await manager.broadcast_to_users(list(contact_ids), offline_event)
+                except Exception as e:
+                    logger.error(f"Error marking user {user_id} offline during WS disconnect: {str(e)}")
+                finally:
+                    db_cleanup.close()
+                    
+    except Exception as e:
+        logger.error(f"Unhandled Exception in WebSocket Connection loop: {str(e)}")
+        logger.error(traceback.format_exc())
         
-        # Check if user has no remaining active sessions
-        if user.id not in manager.active_connections:
-            # We open a fresh connection to the database to ensure we can update user status reliably
-            db_cleanup = SessionLocal()
-            try:
-                db_user = db_cleanup.query(User).filter(User.id == user.id).first()
-                if db_user:
-                    db_user.is_online = False
-                    db_user.last_seen = datetime.utcnow()
-                    db_cleanup.commit()
-                    
-                    logger.info(f"User {user.id} ({user.username}) is now fully offline. Last seen: {db_user.last_seen}")
-                    
-                    # Broadcast offline presence
-                    offline_event = {
-                        "type": "presence",
-                        "user_id": user.id,
-                        "is_online": False,
-                        "last_seen": db_user.last_seen.isoformat()
-                    }
-                    await manager.broadcast_to_users(contact_ids, offline_event)
-            except Exception as e:
-                logger.error(f"Error marking user {user.id} offline on disconnect: {str(e)}")
-                db_cleanup.rollback()
-            finally:
-                db_cleanup.close()
+        # Clean up connection
+        if user_id is not None:
+            manager.disconnect(user_id, websocket)
+            
+        try:
+            await websocket.close(code=4000)
+        except Exception:
+            pass

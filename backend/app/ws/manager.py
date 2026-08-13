@@ -52,8 +52,13 @@ class ConnectionManager:
         """
         Sends JSON data to multiple users.
         """
+        import traceback
         for user_id in user_ids:
-            await self.send_to_user(user_id, data)
+            try:
+                await self.send_to_user(user_id, data)
+            except Exception as e:
+                logger.error(f"Error broadcasting WS event to user {user_id}: {str(e)}")
+                logger.error(traceback.format_exc())
 
 # Global connection manager instance
 manager = ConnectionManager()

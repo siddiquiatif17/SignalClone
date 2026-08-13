@@ -141,6 +141,7 @@ class MessageRead(MessageBase):
     updated_at: datetime
     is_deleted: bool
     receipts: List[MessageReceiptRead] = []
+    sender: Optional[UserRead] = None
 
     class Config:
         from_attributes = True
@@ -184,3 +185,14 @@ class ConversationResponseRead(BaseModel):
 class MessageCreateRequest(BaseModel):
     content: str
     reply_to_id: Optional[int] = None
+
+
+# --- GROUP RESPONSE SCHEMAS (STEP 10) ---
+
+class GroupCreateRequest(BaseModel):
+    name: str
+    member_ids: List[int]
+
+
+class AddMemberRequest(BaseModel):
+    user_id: int

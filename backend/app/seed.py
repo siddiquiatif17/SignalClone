@@ -116,11 +116,22 @@ def seed_db():
         )
         db.add(conv_group)
 
+        # 5. Group Weekend Plans (Alice, Charlie, Diana, Ethan)
+        conv_group2 = Conversation(
+            type=ConversationType.GROUP,
+            name="Weekend Plans",
+            avatar_url="https://api.dicebear.com/7.x/avataaars/svg?seed=weekend",
+            created_by=user_map["charlie"].id,
+            created_at=datetime.utcnow() - timedelta(days=1)
+        )
+        db.add(conv_group2)
+
         db.commit()
         db.refresh(conv_alice_bob)
         db.refresh(conv_alice_charlie)
         db.refresh(conv_bob_charlie)
         db.refresh(conv_group)
+        db.refresh(conv_group2)
         print("Created conversations.")
 
         print("Adding participants...")
@@ -155,6 +166,12 @@ def seed_db():
         p_g_b = add_participant(conv_group.id, user_map["bob"].id, joined_offset_days=2)
         p_g_c = add_participant(conv_group.id, user_map["charlie"].id, joined_offset_days=2)
         p_g_d = add_participant(conv_group.id, user_map["diana"].id, joined_offset_days=2)
+
+        # Participants for Group 2: Charlie (Admin), Alice, Diana, Ethan
+        p_g2_c = add_participant(conv_group2.id, user_map["charlie"].id, role=ParticipantRole.ADMIN, joined_offset_days=1)
+        p_g2_a = add_participant(conv_group2.id, user_map["alice"].id, joined_offset_days=1)
+        p_g2_d = add_participant(conv_group2.id, user_map["diana"].id, joined_offset_days=1)
+        p_g2_e = add_participant(conv_group2.id, user_map["ethan"].id, joined_offset_days=1)
 
         db.commit()
         print(f"Added {len(participants)} participants to conversations.")
@@ -212,6 +229,17 @@ def seed_db():
             (conv_group.id, "alice", "Perfect. Let's aim to demo tomorrow.", now - timedelta(minutes=30), MessageType.TEXT),
             (conv_group.id, "diana", "Will do, my indexes are ready.", now - timedelta(minutes=15), MessageType.TEXT),
             (conv_group.id, "bob", "Finished with typing indicator! Ready for testing.", now - timedelta(minutes=5), MessageType.TEXT),
+
+            # --- Group Conversation: Weekend Plans ---
+            (conv_group2.id, "charlie", "Charlie Brown created the group 'Weekend Plans'", now - timedelta(hours=18), MessageType.SYSTEM),
+            (conv_group2.id, "charlie", "Charlie Brown added Alice Smith, Diana Prince, and Ethan Hunt", now - timedelta(hours=17, minutes=55), MessageType.SYSTEM),
+            (conv_group2.id, "charlie", "Hey folks! Any plans for this weekend? Maybe hiking?", now - timedelta(hours=17, minutes=50), MessageType.TEXT),
+            (conv_group2.id, "ethan", "Hiking sounds awesome. Count me in!", now - timedelta(hours=17, minutes=20), MessageType.TEXT),
+            (conv_group2.id, "diana", "Where are we planning to go?", now - timedelta(hours=16), MessageType.TEXT),
+            (conv_group2.id, "charlie", "How about the Blue Hills Reservation trails?", now - timedelta(hours=15, minutes=30), MessageType.TEXT),
+            (conv_group2.id, "alice", "I would love to join too!", now - timedelta(hours=10), MessageType.TEXT),
+            (conv_group2.id, "ethan", "Great, let's meet at 8:00 AM at the main parking lot.", now - timedelta(hours=5), MessageType.TEXT),
+            (conv_group2.id, "charlie", "Perfect, see you guys there!", now - timedelta(hours=4), MessageType.TEXT),
         ]
 
         # Insert messages and maintain list reference

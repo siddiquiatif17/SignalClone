@@ -76,19 +76,11 @@ async def create_and_broadcast_message(
             delivered_receipts_to_notify.append(p.user_id)
             
     db.commit()
+    db.refresh(db_message)
     
     # 4. Construct JSON event payload matching MessageRead format
-    message_data = {
-        "id": db_message.id,
-        "conversation_id": db_message.conversation_id,
-        "sender_id": db_message.sender_id,
-        "content": db_message.content,
-        "message_type": db_message.message_type.value,
-        "reply_to_id": db_message.reply_to_id,
-        "created_at": db_message.created_at.isoformat(),
-        "updated_at": db_message.updated_at.isoformat(),
-        "is_deleted": db_message.is_deleted
-    }
+    from app.schemas.schemas import MessageRead
+    message_data = MessageRead.model_validate(db_message).model_dump(mode="json")
     
     event_payload = {
         "type": "new_message",

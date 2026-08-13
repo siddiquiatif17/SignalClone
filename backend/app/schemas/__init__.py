@@ -26,6 +26,8 @@ from app.schemas.schemas import (
     ConversationCreateDirect,
     ConversationResponseRead,
     MessageCreateRequest,
+    GroupCreateRequest,
+    AddMemberRequest,
 )
 
 __all__ = [
@@ -56,4 +58,6 @@ __all__ = [
     "ConversationCreateDirect",
     "ConversationResponseRead",
     "MessageCreateRequest",
+    "GroupCreateRequest",
+    "AddMemberRequest",
 ]

@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 
 import { AuthProvider } from "@/context/AuthContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
+import { ToastProvider } from "@/context/ToastContext";
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -26,9 +27,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-slate-950 text-slate-100">
+      <body className="min-h-full flex flex-col bg-slate-950 text-slate-100 transition-colors duration-200">
         <AuthProvider>
-          <WebSocketProvider>{children}</WebSocketProvider>
+          <WebSocketProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </WebSocketProvider>
         </AuthProvider>
       </body>
     </html>
